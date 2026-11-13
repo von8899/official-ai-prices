@@ -1,4 +1,4 @@
-{"schema":1,"currency":"USD","unit":"per_1m_tokens","mode":"standard_text_api_equivalent","sources":{"anthropic":"https://platform.claude.com/docs/en/about-claude/pricing.md","openai":"https://developers.openai.com/api/docs/pricing.md","gemini":"https://aistudio.google.com/docs/pricing"},"records":[
+{"schema":1,"currency":"USD","unit":"per_1m_tokens","mode":"standard_text_api_equivalent","sources":{"anthropic":"https://platform.claude.com/docs/en/about-claude/pricing.md","openai":"https://developers.openai.com/api/docs/pricing.md","gemini":"https://aistudio.google.com/docs/pricing"},"pending_models":[{"name":"gpt-daybreak-blue-latest","platform":"openai","reason":"price_not_listed","source":"https://developers.openai.com/api/docs/pricing.md"},{"name":"gpt-daybreak-red-latest","platform":"openai","reason":"price_not_listed","source":"https://developers.openai.com/api/docs/pricing.md"}],"records":[
 {"name":"claude-fable-5","platform":"anthropic","state":"current","restricted":false,"prices":[10.0,50.0,1.0,12.5,20.0]},
 {"name":"claude-fable-5-1","platform":"anthropic","state":"current","restricted":false,"prices":[10.0,50.0,0.25,12.5,20.0]},
 {"name":"claude-fable-5-2","platform":"anthropic","state":"current","restricted":false,"prices":[8.0,40.0,0.2,10.0,16.0]},
@@ -48,7 +48,7 @@
 {"name":"gpt-5.4-nano","platform":"openai","state":"deprecated","restricted":false,"note":"待退役 2027-04-01","prices":[0.2,1.25,0.02,null,null]},
 {"name":"gpt-5.4-pro","platform":"openai","state":"current","restricted":false,"threshold":272000,"prices":[30.0,180.0,null,null,null],"long_prices":[60.0,270.0,null,null,null]},
 {"name":"gpt-5.5","platform":"openai","state":"current","restricted":false,"threshold":272000,"prices":[5.0,30.0,0.5,null,null],"long_prices":[10.0,45.0,1.0,null,null]},
-{"name":"gpt-5.5-cyber-preview","platform":"openai","state":"deprecated","restricted":true,"note":"待退役 2027-02-01；需专门准入","prices":[12.5,75.0,1.25,null,null]},
+{"name":"gpt-5.5-cyber-preview","platform":"openai","state":"preview","restricted":true,"note":"待退役 2027-02-01；需专门准入","prices":[12.5,75.0,1.25,null,null]},
 {"name":"gpt-5.5-pro","platform":"openai","state":"current","restricted":false,"threshold":272000,"prices":[30.0,180.0,null,null,null],"long_prices":[60.0,270.0,null,null,null]},
 {"name":"gpt-5.6-cyber","platform":"openai","state":"current","restricted":true,"note":"官网当前列售；需专门准入","prices":[12.5,75.0,1.25,15.625,31.25]},
 {"name":"gpt-5.6-luna","platform":"openai","state":"current","restricted":false,"threshold":272000,"prices":[0.2,1.2,0.02,0.25,0.5],"long_prices":[0.4,1.8,0.04,0.5,1.0]},

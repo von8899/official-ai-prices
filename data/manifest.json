@@ -1,10 +1,12 @@
 {
   "schema": 1,
-  "checked_at": "2026-11-13T00:58:21.048334+00:00",
-  "verified_at": "2026-11-13T00:58:21.048334+00:00",
+  "checked_at": "2026-11-13T03:07:23.810665+00:00",
+  "verified_at": "2026-11-13T03:07:23.810665+00:00",
   "status": "ok",
-  "catalog_path": "catalog.1360f2eeb37c9f04021431f08562e0cfe4738ba98b09a7d89c758d735996510b.json",
-  "sha256": "1360f2eeb37c9f04021431f08562e0cfe4738ba98b09a7d89c758d735996510b",
+  "catalog_path": "catalog.3fda8a9bfa1455e20531e39932255096da24d1aee1699e2db6f47ff2a3d3e28c.json",
+  "sha256": "3fda8a9bfa1455e20531e39932255096da24d1aee1699e2db6f47ff2a3d3e28c",
   "model_count": 67,
-  "pending_count": 0
+  "pending_count": 2,
+  "live_count": 67,
+  "archived_count": 0
 }
