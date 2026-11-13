@@ -9,13 +9,15 @@ SOURCES = {
  'openai': {'pricing':'https://developers.openai.com/api/docs/pricing.md',
             'lifecycle':'https://developers.openai.com/api/docs/models/all.md'},
  'gemini': {'pricing':'https://aistudio.google.com/docs/pricing',
-            'lifecycle':'https://aistudio.google.com/docs/deprecations'},
+            'lifecycle':'https://aistudio.google.com/docs/deprecations','models':'https://aistudio.google.com/docs/models'},
 }
 
+MONEY=r'(?:[0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)(?:\.[0-9]+)?'
 def dollars(s):
- return [float(x.replace(',','')) for x in re.findall(r'\$([0-9]+(?:\.[0-9]+)?)',s)]
+ return [float(x.replace(',','')) for x in re.findall(r'\$('+MONEY+r')(?![0-9eE]|[.,][0-9])',s)]
 
 def cell(s):
+ if re.search(r'per\s+(?:request|hour|second|minute|image)|/\s*(?:request|hour|second|minute|image)',s,re.I):raise ValueError('Unsupported billing unit')
  if s.strip()=='-':return None
  v=dollars(s)
  if len(v)!=1:raise ValueError('Unexpected monetary cell: '+s[:80])
@@ -28,10 +30,12 @@ def record(meta,values,long=None,threshold=None):
 def claude(docs,metas,today):
  s=docs['pricing'].split('## Model pricing',1)[1].split('\n## ',1)[0]
  assert 'Base input tokens' in s and '1h cache writes' in s and 'Output tokens' in s
+ labels=['Claude '+re.sub(r'-\d{8}$','',m['name']).split('-')[1]+' '+'.'.join(re.sub(r'-\d{8}$','',m['name']).split('-')[2:]) for m in metas]
  rows=[]
  for line in s.splitlines():
   if line.startswith('| Claude '):
    c=[x.strip() for x in line.strip('|').split('|')]
+   if not any(c[0].lower()==label.lower() or c[0].lower().startswith(label.lower()+' (') for label in labels):continue
    if len(c)!=6:raise ValueError('Claude column count changed')
    rows.append((c[0],[cell(c[i]) for i in [1,5,4,2,3]]))
  states={}
@@ -42,12 +46,14 @@ def claude(docs,metas,today):
  for meta in metas:
   parts=re.sub(r'-\d{8}$','',meta['name']).split('-')
   label='Claude '+parts[1].title()+' '+'.'.join(parts[2:])
-  matches=[(title,v) for title,v in rows if title==label or title.startswith(label+' (')]
+  matches=[(title,v) for title,v in rows if title.lower()==label.lower() or title.lower().startswith(label.lower()+' (')]
   if not matches:raise ValueError('Missing Claude price '+meta['name'])
   low=[v for title,v in matches if 'over ' not in title]
   high=[v for title,v in matches if 'over ' in title]
   if len(low)!=1 or len(high)>1:raise ValueError('Ambiguous Claude tiers '+label)
-  r=record(meta,low[0],high[0] if high else None,100000 if high else None)
+  bounds={int(x.replace(',','')) for title,_ in matches for x in re.findall(r'up to\s+([\d,]+)\s+tokens',title,re.I)}
+  if high and len(bounds)!=1:raise ValueError('Ambiguous Claude threshold')
+  r=record(meta,low[0],high[0] if high else None,next(iter(bounds)) if high else None)
   state=states.get(meta['name'])
   if state:r['state']={'active':'current','deprecated':'deprecated','retired':'retired','legacy':'current'}.get(state,r['state'])
   output.append(r)
@@ -56,18 +62,19 @@ def claude(docs,metas,today):
 def openai(docs,metas,today):
  s=docs['pricing'];assert 'Prices per 1M tokens.' in s
  standard=s.split('### Standard pricing data',1)[1].split('### Batch pricing data',1)[0]
- parsed={}
+ parsed={};wanted={m['name'] for m in metas}
  for line in standard.splitlines():
   c=[x.strip() for x in line.strip('|').split('|')]
-  if not c[0].startswith(('gpt-','o3')):continue
+  if not re.match(r'^(gpt-|o\d|chat-)',c[0]):continue
   name=c[0].split(' ')[0]
+  if name not in wanted:continue
   if len(c) not in [4,11]:raise ValueError('OpenAI standard columns changed')
   p=[cell(x) for x in c[1:]]
   parsed[name]=[p[:5] if len(p)==10 else p+[None,None],p[5:] if len(p)==10 else None]
  special=s.split('Specialized models',1)[1].split('### Grouped Pricing Table data',1)[1].split('### Grouped Pricing Table data',1)[0]
  for line in special.splitlines():
   c=[x.strip() for x in line.strip('|').split('|')]
-  if len(c)!=7 or not c[1].startswith(('gpt-','chat-')):continue
+  if len(c)!=7 or not re.match(r'^(gpt-|o\d|chat-)',c[1]):continue
   name=c[1].split(' ')[0];v=[cell(x) for x in c[2:]]
   if 'long context' in c[1]:
    if any(x is not None for x in v):parsed[name][1]=v
@@ -88,17 +95,17 @@ def openai(docs,metas,today):
 def dated_amounts(text,today):
  """Select text/normal-context amounts; never confuse hourly storage with cache reads."""
  choices=[]
- for match in re.finditer(r'\$([0-9]+(?:\.[0-9]+)?)([^$]*)',text):
+ for match in re.finditer(r'\$('+MONEY+r')(?![0-9eE]|[.,][0-9])([^$]*)',text):
   suffix=match.group(2);lower=suffix.lower()
   if 'storage' in lower or 'per hour' in lower:continue
-  if '(audio)' in lower and 'text' not in lower:continue
+  if any(x in lower for x in ['(audio)','(video)','(image)']) and 'text' not in lower:continue
   start=re.search(r'starting ([A-Z][a-z]+ \d{1,2}, \d{4})',suffix)
   end=re.search(r'through ([A-Z][a-z]+ \d{1,2}, \d{4})',suffix)
   parse=lambda m:dt.datetime.strptime(m.group(1),'%B %d, %Y').date() if m else None
   begin,until=parse(start),parse(end)
   if begin and today<begin or until and today>until:continue
-  high=bool(re.search(r'prompts\s*>\s*200k',lower))
-  choices.append((high,float(match.group(1))))
+  high=bool(re.search(r'prompts\s*>\s*[0-9.]+\s*[km]',lower))
+  choices.append((high,float(match.group(1).replace(',',''))))
  low=[v for high,v in choices if not high];high=[v for high,v in choices if high]
  if len(low)!=1 or len(high)>1:raise ValueError('Ambiguous Gemini amount: '+text[:160])
  return low[0],high[0] if high else None
@@ -131,16 +138,21 @@ def gemini(docs,metas,today):
   pairs=[dated_amounts(v,today) for v in fields]
   low=[v[0] for v in pairs]+[None,None]
   high=[v[1] if v[1] is not None else v[0] for v in pairs]+[None,None] if any(v[1] is not None for v in pairs) else None
-  r=record(meta,low,high,200000 if high else None)
+  bounds={int(float(n)*(1000 if u.lower()=='k' else 1000000)) for text in fields for n,u in re.findall(r'prompts\s*(?:<=|≤|>)\s*([0-9.]+)\s*([kKmM])',text,re.I)}
+  if high and len(bounds)!=1:raise ValueError('Ambiguous Gemini threshold')
+  r=record(meta,low,high,next(iter(bounds)) if high else None)
   future=sorted(set(dt.datetime.strptime(x,'%B %d, %Y').date() for field in fields for x in re.findall(r'starting ([A-Z][a-z]+ \d{1,2}, \d{4})',field)))
   r['scheduled_prices']=[{'from':day.isoformat(),'prices':[dated_amounts(v,day)[0] for v in fields]+[None,None]} for day in future]
   if re.search(r'\x60'+re.escape(meta['name'])+r'\x60 is deprecated',docs['lifecycle']):r['state']='deprecated'
   output.append(r)
+ return apply_gemini_routes(output,docs,today)
+
+def apply_gemini_routes(output,docs,today):
  # Officially announced December routing changes; retain ID, value it at the documented target's rate.
  by_name={x['name']:x for x in output}
  for name,target in [('gemini-2.5-pro','gemini-3.8-flash'),('gemini-2.5-flash','gemini-3.5-flash-lite')]:
   text=docs['lifecycle'];phrase='Effective December 1, 2026'
-  if name in by_name and target in by_name and phrase in text and today>=dt.date(2026,12,1):
+  if name in by_name and target in by_name and by_name[name].get('state') not in ['retired','unlisted'] and phrase in text and today>=dt.date(2026,12,1):
    # Both exact slugs must occur in the same published caution block.
    valid=any(name in b and target in b and phrase in b for b in text.split('{% callout'))
    if not valid:raise ValueError('Gemini migration source changed')

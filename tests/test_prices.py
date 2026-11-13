@@ -8,7 +8,7 @@ class PriceTests(unittest.TestCase):
   self.registry=json.loads((ROOT/'registry.json').read_text(encoding='utf-8'))['models']
   self.catalog=json.loads((ROOT/'data/current.json').read_text(encoding='utf-8'))
  def test_complete_catalog(self):
-  self.assertTrue(validate(self.catalog,self.registry));self.assertEqual(len(self.catalog['records']),67)
+  self.assertTrue(validate(self.catalog,self.registry));self.assertGreaterEqual(len(self.catalog['records']),len(self.registry))
  def test_promotion_boundaries(self):
   s='$2.00 through November 30, 2026. $4.00 starting December 1, 2026.'
   self.assertEqual(dated_amounts(s,dt.date(2026,11,30)),(2,None))
@@ -26,7 +26,7 @@ class PriceTests(unittest.TestCase):
   bad=copy.deepcopy(self.catalog);bad['records'][0]['prices'][0]=0
   with self.assertRaises(AssertionError):validate(bad,self.registry)
  def test_missing_model_rejected(self):
-  bad=copy.deepcopy(self.catalog);bad['records'].pop()
+  bad=copy.deepcopy(self.catalog);bad['records']=[r for r in bad['records'] if r['name']!=self.registry[0]['name']]
   with self.assertRaises(AssertionError):validate(bad,self.registry)
  def test_unexpected_large_change_needs_review(self):
   new=copy.deepcopy(self.catalog);new['records'][0]['prices'][0]*=3

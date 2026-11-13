@@ -2,6 +2,7 @@
 import argparse,datetime as dt,hashlib,json,math,re,urllib.request,urllib.error
 from pathlib import Path
 from parsers import SOURCES,PARSERS
+from inventory import collect,valid_record
 ROOT=Path(__file__).resolve().parent
 ALLOWED={'platform.claude.com','developers.openai.com','aistudio.google.com','ai.google.dev'}
 from urllib.parse import urlparse
@@ -33,12 +34,12 @@ def fetch(url):
 
 def validate(catalog,registry):
  rows=catalog['records'];expected={m['name'] for m in registry}
- assert len(rows)==len(expected) and {r['name'] for r in rows}==expected,'Registry coverage changed'
+ assert 1<=len(rows)<=200 and len({r['name'] for r in rows})==len(rows) and expected.issubset({r['name'] for r in rows}),'Historical registry coverage changed'
  for r in rows:
   assert re.fullmatch(r'[a-z0-9][a-z0-9._-]{1,100}',r['name'])
-  assert r['platform'] in SOURCES and r['state'] in ['current','preview','deprecated','retired']
+  assert r['platform'] in SOURCES and r['state'] in ['current','preview','deprecated','retired','unlisted']
   assert catalog['sources'][r['platform']]==SOURCES[r['platform']]['pricing']
-  assert r.get('threshold') in [None,100000,200000,272000]
+  assert r.get('threshold') is None or type(r['threshold']) is int and 0<r['threshold']<=2000000
   assert bool(r.get('long_prices'))==bool(r.get('threshold'))
   for values in [r['prices']]+([r['long_prices']] if r.get('long_prices') else []):
    assert len(values)==5
@@ -49,7 +50,9 @@ def validate(catalog,registry):
 def review_reasons(old,new,today):
  before={r['name']:r for r in old['records']};reasons=[]
  for row in new['records']:
-  previous=before[row['name']];scheduled=any(e['from']<=today.isoformat() and e['prices']==row['prices'] for e in previous.get('scheduled_prices',[]))
+  previous=before.get(row['name'])
+  if previous is None:continue
+  scheduled=any(e['from']<=today.isoformat() and e['prices']==row['prices'] for e in previous.get('scheduled_prices',[]))
   routed=row['platform']=='gemini' and row.get('billed_as') in ['gemini-3.8-flash','gemini-3.5-flash-lite'] and today>=dt.date(2026,12,1)
   for field in ['threshold','scheduled_prices','billed_as']:
    if previous.get(field)!=row.get(field) and not routed:reasons.append(row['name']+': structural '+field)
@@ -65,16 +68,18 @@ def review_reasons(old,new,today):
     if not scheduled and not routed and (x==0 or abs(y-x)/x>0.20):reasons.append(row['name']+': >20% '+field+'['+str(i)+']')
  return sorted(set(reasons))
 
-def build(registry,sources,today):
- rows=[]
- for provider in SOURCES:
-  rows.extend(PARSERS[provider](sources[provider],[m for m in registry if m['platform']==provider],today))
+def build(registry,sources,today,old=None,loader=None):
+ rows,pending=collect(registry,sources,old,today,loader)
  for row in rows:
   for key in ['long_prices','threshold']:
    if row.get(key) is None:row.pop(key,None)
-  if row.get('note') in ['公开','官网当前列售'] or row['platform']=='gemini':row.pop('note',None)
- result={'schema':1,'currency':'USD','unit':'per_1m_tokens','mode':'standard_text_api_equivalent','sources':{p:v['pricing'] for p,v in SOURCES.items()},'records':sorted(rows,key=lambda r:(r['platform'],r['name']))}
- validate(result,registry);return result
+  if not row.get('note') or row.get('note') in ['公开','官网当前列售'] or row['platform']=='gemini':row.pop('note',None)
+ result={'schema':1,'currency':'USD','unit':'per_1m_tokens','mode':'standard_text_api_equivalent',
+   'sources':{p:v['pricing'] for p,v in SOURCES.items()},'records':sorted(rows,key=lambda r:(r['platform'],r['name'])),
+   'pending_models':pending}
+ validate(result,registry)
+ if len(encoded(result))>120000:raise ValueError('Catalog byte limit')
+ return result
 
 def main():
  ap=argparse.ArgumentParser();ap.add_argument('--source-dir');ap.add_argument('--bootstrap',action='store_true');ap.add_argument('--as-of');args=ap.parse_args()
@@ -88,10 +93,10 @@ def main():
   documents={}
   filenames={'anthropic':{'pricing':'claude-pricing.txt','lifecycle':'claude-lifecycle.txt'},
              'openai':{'pricing':'openai-pricing.md','lifecycle':'openai-models-all.md'},
-             'gemini':{'pricing':'gemini-pricing.md','lifecycle':'gemini-deprecations.md'}}
+             'gemini':{'pricing':'gemini-pricing.md','lifecycle':'gemini-deprecations.md','models':'gemini-models.md'}}
   for provider,urls in SOURCES.items():
    documents[provider]={key:(Path(args.source_dir)/filenames[provider][key]).read_text(encoding='utf-8') if args.source_dir else fetch(url) for key,url in urls.items()}
-  candidate=build(registry,documents,today);sha=digest(candidate)
+  candidate=build(registry,documents,today,old,None if args.source_dir else fetch);sha=digest(candidate)
   reasons=review_reasons(old,candidate,today) if old else []
   policy=json.loads((ROOT/'policy.json').read_text(encoding='utf-8'))
   if reasons and sha not in policy['approved_catalog_hashes']:
@@ -103,8 +108,8 @@ def main():
   with (data/path).open('wb') as f:
    for i in range(0,len(payload),8000):f.write(payload[i:i+8000])
   write(data/'current.json',candidate)
-  write(data/'pending.json',{'pending_count':0})
-  manifest.update(status='ok',verified_at=now.isoformat(),catalog_path=path,sha256=sha)
+  write(data/'pending.json',{'pending_count':len(candidate.get('pending_models',[])),'models':candidate.get('pending_models',[])})
+  manifest.update(status='ok',verified_at=now.isoformat(),catalog_path=path,sha256=sha,model_count=len(candidate['records']),pending_count=len(candidate.get('pending_models',[])),live_count=sum(r['state'] not in ['retired','unlisted'] for r in candidate['records']),archived_count=sum(r['state'] in ['retired','unlisted'] for r in candidate['records']))
   write(data/'manifest.json',manifest)
   print('VERIFIED',len(registry),'models',len(payload),'bytes',sha)
   return 0
