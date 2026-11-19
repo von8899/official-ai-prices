@@ -1,6 +1,6 @@
 {
-  "candidate_hash": "ef477ddb674f1a3e472c2a1d8ebc815330d24c32d7927b60873054a07790bbea",
-  "checked_at": "2026-11-18T03:43:31.038098+00:00",
+  "candidate_hash": "566ddb87133d8105475551495f07aa38f7a36efa676deaa0b7453ccb021e4e48",
+  "checked_at": "2026-11-19T03:33:42.980583+00:00",
   "reasons": [
     "gpt-6-rosalind: >20% long_prices[0]",
     "gpt-6-rosalind: >20% long_prices[1]",
@@ -500,6 +500,22 @@
           null
         ],
         "scheduled_prices": []
+      },
+      {
+        "name": "gemini-4-neon",
+        "platform": "gemini",
+        "state": "current",
+        "restricted": false,
+        "prices": [
+          3.0,
+          15.0,
+          0.15,
+          null,
+          null
+        ],
+        "scheduled_prices": [],
+        "admission": "official_standard",
+        "admitted_on": "2026-11-19"
       },
       {
         "name": "chat-latest",
@@ -1080,7 +1096,7 @@
           40.0
         ],
         "admission": "official_standard",
-        "admitted_on": "2026-11-18"
+        "admitted_on": "2026-11-19"
       },
       {
         "name": "gpt-6.2-sol",
@@ -1103,7 +1119,7 @@
           10.0
         ],
         "admission": "official_standard",
-        "admitted_on": "2026-11-18"
+        "admitted_on": "2026-11-19"
       },
       {
         "name": "gpt-rosalind-discovery",
