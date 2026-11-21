@@ -1,6 +1,6 @@
 {
-  "candidate_hash": "16e3674fa545f824b991884c300e2c138881ed7f2256158e2d3879e6d4fc79dd",
-  "checked_at": "2026-11-20T03:22:34.037166+00:00",
+  "candidate_hash": "a79818fcf9969eadcd81b8e87320e13455a7dc53534ca0eb494f932aa8ae4b5a",
+  "checked_at": "2026-11-21T03:14:57.612014+00:00",
   "reasons": [
     "gpt-6-rosalind: >20% long_prices[0]",
     "gpt-6-rosalind: >20% long_prices[1]",
@@ -515,7 +515,7 @@
         ],
         "scheduled_prices": [],
         "admission": "official_standard",
-        "admitted_on": "2026-11-20"
+        "admitted_on": "2026-11-21"
       },
       {
         "name": "chat-latest",
@@ -1096,7 +1096,7 @@
           40.0
         ],
         "admission": "official_standard",
-        "admitted_on": "2026-11-20"
+        "admitted_on": "2026-11-21"
       },
       {
         "name": "gpt-6.2-sol",
@@ -1119,7 +1119,7 @@
           10.0
         ],
         "admission": "official_standard",
-        "admitted_on": "2026-11-20"
+        "admitted_on": "2026-11-21"
       },
       {
         "name": "gpt-rosalind-discovery",
